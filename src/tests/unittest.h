@@ -65,10 +65,10 @@ extern uint8_t RECEIVE_BUFFER[SEND_BUFFER_SIZE];
  *  Substitute method for the HID init
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testGenericInit(
         void
         );
@@ -78,12 +78,12 @@ testGenericInit(
  *  Substitute method for the HID close
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testGenericClose(
-        HIDInterface *const hidif
+        hid_device *const hidif
         );
 
 //-----------------------------------------------------------------------------
@@ -91,12 +91,12 @@ testGenericClose(
  *  Substitute method for the HID read
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testGenericRead(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         char* const bytes,
         unsigned int const size,
@@ -108,12 +108,12 @@ testGenericRead(
  *  Substitute method for the HID write
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testGenericWrite(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         const char* bytes,
         unsigned int const size,
@@ -125,10 +125,10 @@ testGenericWrite(
  *  Substitute method for the HID clean
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testGenericCleanup(
         void
         );
@@ -138,12 +138,12 @@ testGenericCleanup(
  *  Substitute method for the HID delete interface
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
 void
 testGenericDeleteIf(
-        HIDInterface **const hidif
+        hid_device **const hidif
         );
 
 //-----------------------------------------------------------------------------
@@ -151,15 +151,14 @@ testGenericDeleteIf(
  *  Substitute method for the HID Force Open
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
-testGenericForceOpen(
-        HIDInterface *const hidif,
-        int const interface,
-        HIDInterfaceMatcher const *const matcher,
-        unsigned short retries
+hid_device * 
+testOpen(
+        unsigned short vendor_id, 
+		unsigned short product_id, 
+		const wchar_t *serial_number
         );
 
 //-----------------------------------------------------------------------------
@@ -167,10 +166,10 @@ testGenericForceOpen(
  *  Substitute method for the new HID Interface
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-HIDInterface *
+hid_device *
 testGenericNewHidInterface(
         void
         );
@@ -186,10 +185,10 @@ testGenericNewHidInterface(
  *  Substitute method for the HID init
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testInit(
         void
         );
@@ -199,12 +198,12 @@ testInit(
  *  Substitute method for the HID read
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testRead(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         char* const bytes,
         unsigned int const size,
@@ -216,12 +215,12 @@ testRead(
  *  Substitute method for the HID write
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-hid_return
+int
 testWrite(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         const char* bytes,
         unsigned int const size,

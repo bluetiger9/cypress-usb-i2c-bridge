@@ -95,13 +95,14 @@ cy3240_debug_print_packet(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_debug_print_send_packet(
-        const uint8_t* const buffer,
+        const uint8_t* buffer,
         uint16_t length
         )
 {
     if ((buffer != NULL) &&
         (length != 0)) {
 
+    	buffer = buffer + 1;
         int count;
 
         printf("\nSending packet: (Length=%i)", length);
@@ -109,23 +110,24 @@ cy3240_debug_print_send_packet(
         /* Not worrying about code size right now...still in debug mode */
         if(buffer[0] & CONTROL_BYTE_I2C_READ)
             printf("\nReading ");
-        else
+        else {
             printf("\nWriting ");
 
-        if(buffer[0] & CONTROL_BYTE_START)
-            printf("a start condition ");
+			if(buffer[0] & CONTROL_BYTE_START)
+				printf("a start condition ");
 
-        if(buffer[0] & CONTROL_BYTE_RESTART)
-            printf("a restart condition ");
+			if(buffer[0] & CONTROL_BYTE_RESTART)
+				printf("a restart condition ");
 
-        if(buffer[0] & CONTROL_BYTE_STOP)
-            printf("a stop condition ");
+			if(buffer[0] & CONTROL_BYTE_STOP)
+				printf("a stop condition ");
 
-        if(buffer[0] & CONTROL_BYTE_REINIT)
-            printf("a reinitialization command ");
+			if(buffer[0] & CONTROL_BYTE_REINIT)
+				printf("a reinitialization command ");
 
-        if(buffer[0] & CONTROL_BYTE_RECONFIG)
-            printf("a reconfiguration command ");
+			if(buffer[0] & CONTROL_BYTE_RECONFIG)
+				printf("a reconfiguration command ");
+        }
 
         // Check the current bus configuration
         switch(buffer[0] & CY3240_BUS_MASK) {
@@ -183,9 +185,6 @@ cy3240_debug_print_receive_control_packet(
 
         if (packet[0] & 0x04)
             printf("\nThe device is powered");
-
-        else
-            printf("\nThe device is not powered");
 
         if (packet[0] & 0x02)
             printf("\nAn interrupt was received");

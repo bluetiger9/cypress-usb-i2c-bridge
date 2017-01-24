@@ -62,8 +62,8 @@ AM_PROG_LIBTOOL
 # ------------------------------
 # Checks for libraries.
 # ------------------------------
-AC_CHECK_LIB([hid], [hid_new_HIDInterface])
-AC_CHECK_LIB([usb], [libusb_alloc_transfer])
+AC_CHECK_LIB([hidapi-libusb], [hid_open])
+#AC_CHECK_LIB([usb], [libusb_alloc_transfer])
 
 # ------------------------------
 # Checks for header files.

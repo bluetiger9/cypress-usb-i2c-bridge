@@ -21,6 +21,8 @@ extern "C" {
 /// @name Includes
 //@{
 
+#include <stdbool.h>
+#include <wchar.h>
 #include "cy3240.h"
 #include "cy3240_types.h"
 #include "cy3240_util.h"
@@ -44,9 +46,9 @@ extern "C" {
 //-----------------------------------------------------------------------------
 bool
 cy3240_util_match_serial_number(
-        struct usb_dev_handle* usbdev,
-        void* custom,
-        unsigned int len
+        hid_device* device,
+        const wchar_t* custom,
+        size_t len
         );
 
 //@} End of Methods

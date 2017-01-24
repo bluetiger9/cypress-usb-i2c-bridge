@@ -21,7 +21,7 @@ extern "C" {
 /// @name Includes
 //@{
 
-#include <hid.h>
+#include <hidapi/hidapi.h>
 #include "cy3240_types.h"
 
 //@} End of Includes
@@ -33,32 +33,24 @@ extern "C" {
 /**
  * Function pointer for the HID write function
  */
-typedef hid_return
+typedef int
 (*hid_write_fpt)(
-        HIDInterface* const,
-        unsigned int const,
-        const char*,
-        unsigned int const,
-        unsigned int const
+        hid_device *device, const unsigned char *data, size_t length
         );
 
 /**
  * Function pointer for the HID read function
  */
-typedef hid_return
+typedef int
 (*hid_read_fpt)(
-        HIDInterface* const,
-        unsigned int const,
-        char* const,
-        unsigned int const,
-        unsigned int const
+        hid_device *dev, unsigned char *data, size_t length, int milliseconds
         );
 
 
 /**
  * Function pointer for the HID init function
  */
-typedef hid_return
+typedef int
 (*hid_init_fpt)(
         void
         );
@@ -66,45 +58,47 @@ typedef hid_return
 /**
  * Function pointer for the HID close function
  */
-typedef hid_return
+typedef void
 (*hid_close_fpt)(
-        HIDInterface *const hidif
+        hid_device *const hidif
         );
 
 /**
  * Function pointer for the HID cleanup function
- */
-typedef hid_return
+ 
+typedef int
 (*hid_cleanup_fpt)(
         void
         );
-
+*/
 /**
  * Function pointer for the HID delete interface function
- */
+ 
 typedef void
-(*hid_delete_HIDInterface_fpt)(
-        HIDInterface **const hidif
+(*hid_delete_hid_device_fpt)(
+        hid_device **const hidif
         );
+*/
 
 /**
  * Function pointer for the HID force open function
  */
-typedef hid_return
-(*hid_force_open_fpt)(
-        HIDInterface *const hidif,
-        int const interface,
-        HIDInterfaceMatcher const *const matcher,
-        unsigned short retries
+typedef hid_device *
+(*hid_open_fpt)(
+        unsigned short vendor_id, 
+		unsigned short product_id, 
+		const wchar_t *serial_number
         );
 
 /**
  * Function pointer for the HID new Interface function
- */
-typedef HIDInterface *
-(*hid_new_HIDInterface_fpt)(
+ 
+typedef hid_device *
+(*hid_new_hid_device_fpt)(
         void
         );
+*/
+
 /**
  * Structure to wrap the hid interface
  */
@@ -113,10 +107,7 @@ typedef struct {
     hid_close_fpt close;                       ///< Pointer to the hid close function
     hid_write_fpt write;                       ///< Pointer to the hid write function
     hid_read_fpt read;                         ///< Pointer to the hid read function
-    hid_cleanup_fpt cleanup;                   ///< Pointer to the hid cleanup function
-    hid_delete_HIDInterface_fpt delete_if;     ///< Pointer to the hid delete interface function
-    hid_force_open_fpt force_open;             ///< Pointer to the hid force open function
-    hid_new_HIDInterface_fpt new_if;           ///< Pointer to the hid new interface function
+    hid_open_fpt open;      				       ///< Pointer to the hid force open function
 } hid_wrapper_t;
 
 /**
@@ -130,7 +121,7 @@ typedef struct {
     Cy3240_I2C_ClockSpeed_t clock;             ///< The clock speed
     Cy3240_Bus_t bus;                          ///< The bus configuration
     Cy3240_Power_t power;                      ///< The power configuration
-    HIDInterface *pHid;                        ///< HID Interface
+    hid_device *pHid;                          ///< HID Interface
     hid_wrapper_t w;                           ///< HID interface wrapper
 } Cy3240_t;
 

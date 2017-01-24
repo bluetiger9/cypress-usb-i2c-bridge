@@ -16,7 +16,10 @@
 //@{
 
 #include <stdio.h>
-#include "hid.h"
+#include <stdbool.h>
+#include <stdlib.h>
+#include <wchar.h>
+#include "hidapi/hidapi.h"
 #include "cy3240_types.h"
 #include "cy3240_util.h"
 
@@ -30,25 +33,19 @@
 //-----------------------------------------------------------------------------
 bool
 cy3240_util_match_serial_number(
-        struct usb_dev_handle* usbdev,
-        void* custom,
-        unsigned int len
+        hid_device* device,
+		const wchar_t* custom,
+        size_t len
         )
 {
-    bool ret;
-
     // Allocate a buffer to read the current usb device's serial number
-    char* buffer = (char*)malloc (len);
+    wchar_t* buffer = (wchar_t*) malloc (len * sizeof(wchar_t));
 
     // Get the serial number of the specfied device
-    usb_get_string_simple(
-            usbdev,
-            usb_device(usbdev)->descriptor.iSerialNumber,
-            buffer,
-            len);
+    hid_get_serial_number_string(device, buffer, len);
 
     // Compare the current serial number with the one we are looking for
-    ret = strncmp(buffer, (char*)custom, len) == 0;
+    bool ret = wcsncmp(buffer, custom, len) == 0;
 
     // Free the temporary buffer
     free(buffer);

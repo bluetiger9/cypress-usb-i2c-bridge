@@ -23,14 +23,14 @@ libcy3240_la_SOURCES = \
 	src/jni/native_cy3240bridgecontroller.c \
 	src/jni/native_cy3240bridgecontroller.h
 
-libcy3240_la_LIBADD= -lusb -lhid
+libcy3240_la_LIBADD= -lhidapi-libusb
 
 # cy3240-i2c Test Application
 cy3240_i2c_SOURCES = \
 	src/main.c \
 	src/i2c_demo.h
 
-cy3240_i2c_LDADD= -lusb -lhid -lcy3240
+cy3240_i2c_LDADD= -lhidapi-libusb -lcy3240
 
 # Unit Test Application
 runTests_SOURCES = \
@@ -56,4 +56,4 @@ runTests_SOURCES = \
 	aceunit/src/native/ExceptionHandling.c \
 	aceunit/src/native/ExceptionHandling.h
 
-runTests_LDADD= -lusb -lhid -lcy3240
+runTests_LDADD= -lhidapi-libusb -lcy3240

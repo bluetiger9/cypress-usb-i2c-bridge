@@ -31,9 +31,12 @@
 /// @name Includes
 //@{
 
-#include <hid.h>
+#include <hidapi/hidapi.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <time.h>
 #include "config.h"
@@ -50,12 +53,14 @@
 /// @name Defines
 //@{
 
-#define SEND_PACKET_LEN (64)
+#define SEND_PACKET_LEN (65)
 #define RECV_PACKET_LEN (64)
 
 /* Result Macros */
-#define HID_SUCCESS(s)  ((s == HID_RET_SUCCESS) ? TRUE : FALSE)
-#define HID_FAILURE(s)  ((s != HID_RET_SUCCESS) ? TRUE : FALSE)
+#define HID_SUCCESS(s)  ((s == 0) ? TRUE : FALSE)
+#define HID_FAILURE(s)  ((s != 0) ? TRUE : FALSE)
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
 
 //@} End of Defines
 
@@ -63,14 +68,8 @@
 /// @name Data
 //@{
 
-/**
- * Interrupt endpoints, the primary mechanism to send and receive I2C data
- */
-const int INPUT_ENDPOINT   = 0x82;              ///< The input usb endpoint
-const int OUTPUT_ENDPOINT  = 0x01;              ///< The output usb endpoint
-
 // The sending buffer
-char SEND_PACKET[SEND_PACKET_LEN] = {
+char SEND_PACKET[SEND_PACKET_LEN] = { 0x00,
     0x03, 0x02, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
@@ -94,53 +93,6 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 //////////////////////////////////////////////////////////////////////
 /// @name Private Methods
 //@{
-
-
-#if DEBUG
-//-----------------------------------------------------------------------------
-/**
- *  Method to enable HID debug messages
- *
- *  @returns hid_return
- */
-//-----------------------------------------------------------------------------
-static hid_return
-enable_hid_debug(
-          void
-          )
-{
-    // see include/debug.h for possible values
-    hid_set_debug(HID_DEBUG_ALL);
-    hid_set_debug_stream(stderr);
-
-    //passed directly to libusb
-    hid_set_usb_debug(0);
-
-    return HID_RET_SUCCESS;
-}   /* -----  end of static function enable_debug  ----- */
-
-//-----------------------------------------------------------------------------
-/**
- *  Method to disable the USB HID debugging
- *
- *  @returns hid_return
- */
-//-----------------------------------------------------------------------------
-static hid_return
-disable_hid_debug(
-          void
-          )
-{
-    // Configure hid debugging
-    // see include/debug.h for possible values
-    hid_set_debug(HID_DEBUG_NONE);
-    hid_set_debug_stream(stderr);
-    hid_set_usb_debug(0);
-
-    return HID_RET_SUCCESS;
-}
-#endif // DEBUG
-
 
 //-----------------------------------------------------------------------------
 /**
@@ -171,33 +123,34 @@ transcieve(
         (pReceiveLength != NULL) &&
         (*pReceiveLength != 0)) {
 
-        hid_return error = HID_RET_SUCCESS;
+        int error = 0;
 
         CY3240_DEBUG_PRINT_TX_PACKET(pSendData, *pSendLength);
 
         // Write the data to the USB HID device
-        error = pCy3240->w.write(
+        error = hid_write(
                 pCy3240->pHid,
-                OUTPUT_ENDPOINT,
                 pSendData,
-                SEND_PACKET_LEN,
-                pCy3240->timeout);
+                SEND_PACKET_LEN);
 
-        if (error != HID_RET_SUCCESS) {
-            fprintf(stderr, "hid_set_output_report failed with return code %d\n", error);
+        if (error == -1) {
+            fprintf(stderr, "hid_write failed with return code %d\n", error);
             return CY3240_ERROR_HID;
         }
 
         // Read the response data from the USB HID device
-        error = pCy3240->w.read(
+        error = hid_read_timeout(
                 pCy3240->pHid,
-                INPUT_ENDPOINT,
                 pReceiveData,
                 RECV_PACKET_LEN,
                 pCy3240->timeout);
 
-        if (error != HID_RET_SUCCESS) {
+        if (error == -1) {
             fprintf(stderr, "hid_get_input_report failed with return code %d\n", error);
+            return CY3240_ERROR_HID;
+
+        } else if (error == 0) {
+            fprintf(stderr, "no bytes read\n");
             return CY3240_ERROR_HID;
         }
 
@@ -205,6 +158,8 @@ transcieve(
 
         return CY3240_ERROR_OK;
     }
+
+    return CY3240_ERROR_HID;
 }
 
 
@@ -225,12 +180,13 @@ pack_reconfigure_power(
 {
     // Check the parameters
     if (pLength != NULL) {
+		memset(SEND_PACKET, 0u, 64);
 
         // Initialize the byte index
-        uint8_t byteIndex = 0;
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_I2C_WRITE | CONTROL_BYTE_START;
-        SEND_PACKET[byteIndex++] = LENGTH_BYTE_LAST_PACKET | 0x01;
+        SEND_PACKET[byteIndex++] = 0;
 
         // Set the I2C address of the CY3240 control register
         SEND_PACKET[byteIndex++] = CONTROL_I2C_ADDRESS;
@@ -264,9 +220,10 @@ pack_reconfigure_clock(
 {
     // Check the parameters
     if (pLength != NULL) {
+		memset(SEND_PACKET, 0u, 64);
 
         // Initialize the byte index
-        uint8_t byteIndex = 0;
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_RECONFIG | clock;
         SEND_PACKET[byteIndex++] = LENGTH_BYTE_LAST_PACKET;
@@ -298,9 +255,10 @@ pack_restart(
         )
 {
     if (pLength != NULL) {
+		memset(SEND_PACKET, 0u, 64);
 
         // Initialize the byte index
-        uint8_t byteIndex = 0;
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_I2C_WRITE | CONTROL_BYTE_RESTART;
         SEND_PACKET[byteIndex++] = LENGTH_BYTE_LAST_PACKET;
@@ -331,9 +289,10 @@ pack_reinit(
         )
 {
     if (pLength != NULL) {
+		memset(SEND_PACKET, 0u, 64);
 
         // Initialize the byte index
-        uint8_t byteIndex = 0;
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_I2C_WRITE | CONTROL_BYTE_REINIT;
         SEND_PACKET[byteIndex++] = LENGTH_BYTE_LAST_PACKET;
@@ -376,9 +335,9 @@ pack_write_input(
     if ((pSendData != NULL) &&
         (pSendLength != NULL) &&
         (*pSendLength != 0)) {
-
+				memset(SEND_PACKET, 0u, 64);
         // Initialize the byte index
-        uint8_t byteIndex = 0;
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_I2C_WRITE | CONTROL_BYTE_START;
         SEND_PACKET[byteIndex++] = (uint8_t)*pSendLength;
@@ -480,8 +439,8 @@ pack_read_input (
     // Check the parameters
     if ((pReadLength != NULL) &&
         (*pReadLength != 0)) {
-
-        uint8_t byteIndex = 0;
+				memset(SEND_PACKET, 0u, 64);
+        uint8_t byteIndex = 1;
 
         SEND_PACKET[byteIndex++] = CONTROL_BYTE_I2C_READ | CONTROL_BYTE_START | CONTROL_BYTE_STOP;
         SEND_PACKET[byteIndex++] = (uint8_t)*pReadLength;
@@ -636,7 +595,7 @@ reconfigure_clock(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_restart(
-        int handle
+        void *handle
         )
 {
     // The handle is the pointer to the state structure
@@ -705,7 +664,7 @@ cy3240_restart(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_reinit(
-        int handle
+        void *handle
         )
 {
     // The handle is the pointer to the state structure
@@ -761,7 +720,7 @@ cy3240_reinit(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_reconfigure(
-        int handle,
+        void *handle,
         Cy3240_Power_t power,
         Cy3240_Bus_t bus,
         Cy3240_I2C_ClockSpeed_t clock
@@ -777,6 +736,18 @@ cy3240_reconfigure(
 
         pthread_mutex_lock(&mutex);
 
+        // Set the clock mode
+           if CY3240_SUCCESS(result) {
+
+                result = reconfigure_clock(
+                        pCy3240,
+                        clock);
+
+                if CY3240_FAILURE(result)
+                    printf("Failed to set the requested clock mode: %02x\n", clock);
+
+           }
+
         // Change the power mode
         if CY3240_SUCCESS(result) {
 
@@ -788,17 +759,7 @@ cy3240_reconfigure(
                 printf("Failed to set the requested power mode: %02x\n", power);
         }
 
-        // Set the clock mode
-        if CY3240_SUCCESS(result) {
 
-             result = reconfigure_clock(
-                     pCy3240,
-                     clock);
-
-             if CY3240_FAILURE(result)
-                 printf("Failed to set the requested clock mode: %02x\n", clock);
-
-        }
 
         // TODO: Changing bus not supported
         if CY3240_SUCCESS(result) {
@@ -819,7 +780,7 @@ cy3240_reconfigure(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_write(
-        int handle,
+        void *handle,
         uint8_t address,
         const uint8_t* const pData,
         uint16_t* const pLength
@@ -918,7 +879,7 @@ cy3240_write(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_read(
-        int handle,
+        void *handle,
         uint8_t address,
         uint8_t* const pData,
         uint16_t* const pLength
@@ -974,6 +935,8 @@ cy3240_read(
                     printf("Failed to transmit read packet\n");
             }
 
+			printf("read lengt: %d\n", readLength);
+
             // unpack the result
             if (CY3240_SUCCESS(result)) {
 
@@ -1000,10 +963,46 @@ cy3240_read(
     return CY3240_ERROR_INVALID_PARAMETERS;
 }
 
+
+static void writeInternal(const Cy3240_t* pCy3240, const uint8_t address) {
+
+	memset(SEND_PACKET, 0u, 64);
+
+    // Initialize the byte index
+    SEND_PACKET[1] = 0x02;
+    SEND_PACKET[2] = 0x00;
+    SEND_PACKET[3] = address;
+    SEND_PACKET[4] = 0x00;
+
+	uint16_t writeLength = 5;
+
+	uint16_t readLength = writeLength + CY3240_STATUS_CODE_SIZE;
+
+	int result = transcieve(
+			pCy3240, SEND_PACKET, &writeLength, RECV_PACKET, &readLength);
+
+	// Send the data
+    if CY3240_FAILURE(result)
+        printf("Failed to transmit internal write packet\n");
+
+}
+
+static void write81(const Cy3240_t* pCy3240) {
+    printf("Writing to 0x81...\n");
+	writeInternal(pCy3240, 0x81);
+	printf("...done\n.");
+}
+
+static void write8f(const Cy3240_t* pCy3240) {
+	printf("Writing to 0x8f...\n");
+	writeInternal(pCy3240, 0x8f);
+	printf("...done\n.");
+}
+
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_open(
-        int handle
+        void *handle
         )
 {
     // The handle is the pointer to the state structure
@@ -1011,29 +1010,15 @@ cy3240_open(
 
     if (pCy3240 != NULL) {
 
-        hid_return error = HID_RET_SUCCESS;
+        int error = 0;
         Cy3240_Error_t result = CY3240_ERROR_OK;
 
-        HIDInterfaceMatcher matcher = {pCy3240->vendor_id, pCy3240->product_id, NULL, NULL, 0};
+        //hid_deviceMatcher matcher = {pCy3240->vendor_id, pCy3240->product_id, NULL, NULL, 0};
 
         pthread_mutex_lock(&mutex);
-#ifdef DEBUG
-
-        // Enable hid debugging
-        if CY3240_SUCCESS(result) {
-
-            error = enable_hid_debug();
-
-            if (HID_FAILURE(error)) {
-                 fprintf(stderr, "hid debug enable failed with return code %d\n", error);
-                 result = CY3240_ERROR_HID;
-            }
-        }
-#endif
 
         // Initialize the device
         if CY3240_SUCCESS(result) {
-
             error = pCy3240->w.init();
 
             if (HID_FAILURE(error)) {
@@ -1042,68 +1027,47 @@ cy3240_open(
             }
         }
 
-        // Create the interface to the device
-        if CY3240_SUCCESS(result) {
-
-            pCy3240->pHid = pCy3240->w.new_if();
-
-            if (pCy3240->pHid == NULL) {
-                 fprintf(stderr, "hid_new_HIDInterface() failed, out of memory?\n");
-                 result = CY3240_ERROR_HID;
-            }
-        }
-
         // For open the usb device
         if CY3240_SUCCESS(result) {
 
-            error = pCy3240->w.force_open(
-                      pCy3240->pHid,
-                      pCy3240->iface_number,
-                      &matcher,
-                      3);
+            fprintf(stdout, "hid_open %d %d %d\n", pCy3240->vendor_id, pCy3240->product_id, NULL);
+            //pCy3240->pHid = hid_open_path("/dev/usb/hiddev2");
 
-            if (HID_FAILURE(error)) {
+            pCy3240->pHid = pCy3240->w.open(pCy3240->vendor_id, pCy3240->product_id, NULL);
+            fprintf(stdout, "hid device address: %d\n", pCy3240->pHid);
+
+
+       		if (pCy3240->pHid == NULL) {
                 fprintf(stderr, "hid_force_open failed with return code %d\n", error);
                 result = CY3240_ERROR_HID;
             }
+
+			#define MAX_STR 255
+			wchar_t wstr[MAX_STR];
+
+			// Read the Manufacturer String
+			hid_get_manufacturer_string(pCy3240->pHid, wstr, MAX_STR);
+			printf("Manufacturer String: %ls\n", wstr);
+
+			// Read the Product String
+			hid_get_product_string(pCy3240->pHid, wstr, MAX_STR);
+			printf("Product String: %ls\n", wstr);
+
+			// Read the Serial Number String
+			hid_get_serial_number_string(pCy3240->pHid, wstr, MAX_STR);
+			printf("Serial Number String: %ls", wstr);
+			printf("\n");
+
+			//printf("Numbered reorts: %d\n", pCy3240->pHid->uses_numbered_reports);
+
+     
         }
-
-#ifdef DEBUG
-
-        // Write the USB ID to the console
-        if CY3240_SUCCESS(result) {
-
-            error = hid_write_identification(stdout, pCy3240->pHid);
-
-            if (HID_FAILURE(error)) {
-                 fprintf(stderr, "hid_write_identification failed with return code %d\n", error);
-                 result = CY3240_ERROR_HID;
-            }
-        }
-
-        // Write the USB tree to the console
-        if CY3240_SUCCESS(result) {
-
-            error = hid_dump_tree(stdout, pCy3240->pHid);
-
-            if (HID_FAILURE(error)) {
-                 fprintf(stderr, "hid_dump_tree failed with return code %d\n", error);
-                 result = CY3240_ERROR_HID;
-            }
-        }
-
-        // Disable HID debugging
-        if CY3240_SUCCESS(result) {
-
-            error = disable_hid_debug();
-
-            if (HID_FAILURE(error)) {
-                 fprintf(stderr, "hid debug disable failed with return code %d\n", error);
-                 result = CY3240_ERROR_HID;
-            }
-        }
-#endif
-
+		
+        // TODO: figure out why these commands are needed
+        write81(pCy3240);
+        write8f(pCy3240);
+        write81(pCy3240);
+				
         pthread_mutex_unlock(&mutex);
 
         return result;
@@ -1115,7 +1079,7 @@ cy3240_open(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_close(
-        int handle
+        void *handle
         )
 {
     // The handle is the pointer to the state structure
@@ -1124,34 +1088,13 @@ cy3240_close(
     if (pCy3240 != NULL) {
 
         Cy3240_Error_t result = CY3240_ERROR_OK;
-        hid_return error = HID_RET_SUCCESS;
+        int error = 0;
 
         pthread_mutex_lock(&mutex);
 
         // Close the connection
         if (CY3240_SUCCESS(result)) {
-
-            error = pCy3240->w.close(pCy3240->pHid);
-
-            if (HID_FAILURE(error)) {
-
-                fprintf(stderr, "hid_close failed with return code %d\n", error);
-                result = CY3240_ERROR_HID;
-            }
-        }
-
-        // Delete the interface
-        if (CY3240_SUCCESS(result)) {
-
-            pCy3240->w.delete_if(&pCy3240->pHid);
-
-            error = pCy3240->w.cleanup();
-
-            if (HID_FAILURE(error)) {
-
-                fprintf(stderr, "hid_cleanup failed with return code %d\n", error);
-                result = CY3240_ERROR_HID;
-            }
+            pCy3240->w.close(pCy3240->pHid);
         }
 
         // Free unused resources
@@ -1169,7 +1112,7 @@ cy3240_close(
 //-----------------------------------------------------------------------------
 Cy3240_Error_t
 cy3240_factory (
-        int* pHandle,
+        void **pHandle,
         int iface_number,
         int timeout,
         Cy3240_Power_t power,
@@ -1177,11 +1120,9 @@ cy3240_factory (
         Cy3240_I2C_ClockSpeed_t clock
         )
 {
-     // The handle is the pointer to the state structure
-     Cy3240_t* pCy3240;
 
-     // Allocate the handle
-     pCy3240 = (Cy3240_t*)malloc(sizeof(Cy3240_t));
+     // The handle is the pointer to the state structure
+     Cy3240_t* pCy3240 = (Cy3240_t*)malloc(sizeof(Cy3240_t));
 
      // Check the parameters
      if (pCy3240 != NULL) {
@@ -1196,14 +1137,10 @@ cy3240_factory (
           pCy3240->clock = clock;
           pCy3240->w.init = hid_init;
           pCy3240->w.close = hid_close;
-          pCy3240->w.write = hid_interrupt_write;
-          pCy3240->w.read = hid_interrupt_read;
-          pCy3240->w.cleanup = hid_cleanup;
-          pCy3240->w.delete_if = hid_delete_HIDInterface;
-          pCy3240->w.force_open = hid_force_open;
-          pCy3240->w.new_if = hid_new_HIDInterface;
+          pCy3240->w.write = hid_write;
+          pCy3240->w.read = hid_read_timeout;
+          pCy3240->w.open = hid_open;
 
-          // Initialize the handle
           *pHandle = pCy3240;
 
           return CY3240_ERROR_OK;

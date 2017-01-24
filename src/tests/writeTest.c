@@ -40,12 +40,12 @@ uint8_t* pWrite;
  *  Substitute method for the HID write
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-static hid_return
+static int
 myWrite(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         const char* bytes,
         unsigned int const size,
@@ -57,10 +57,10 @@ myWrite(
     // Write the data to the send buffer
     memcpy(pWrite, bytes, size);
 
-    // Move the write pointer
+    // Move the write pointers
     pWrite += size;
 
-    return HID_RET_SUCCESS;
+    return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -68,12 +68,12 @@ myWrite(
  *  Substitute method for the HID read
  *
  *  @see hid.h
- *  @returns hid_return
+ *  @returns int
  */
 //-----------------------------------------------------------------------------
-static hid_return
+static int
 myRead(
-        HIDInterface* const hidif,
+        hid_device* const hidif,
         unsigned int const ep,
         char* const bytes,
         unsigned int const size,
@@ -88,7 +88,7 @@ myRead(
     // Set the status byte to something unique
     bytes[0] = 0x07;
 
-    return HID_RET_SUCCESS;
+    return 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -134,10 +134,7 @@ testWriteSetup(
     pMyData->w.close = testGenericClose;
     pMyData->w.write = myWrite;
     pMyData->w.read = myRead;
-    pMyData->w.cleanup = testGenericCleanup;
-    pMyData->w.delete_if = testGenericDeleteIf;
-    pMyData->w.force_open = testGenericForceOpen;
-    pMyData->w.new_if = testGenericNewHidInterface;
+    pMyData->w.open = testOpen;
 
     // Open the device
     result = cy3240_open(handle);
